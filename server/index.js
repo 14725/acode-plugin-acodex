@@ -22,7 +22,7 @@ server.on("connection", function (connection) {
     });
     connection.on("message", function (message) {
         const command = typeof message === "string" ? message.trim() : message.toString("utf8").trim();
-		if(message == PAUSE || message == RESUME) {
+		if(command == PAUSE || command == RESUME) {
 			shell.write(command);	
 			return;
 		}
