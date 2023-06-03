@@ -289,9 +289,42 @@ class AcodeX {
     }
     
     async _checkForWSMessage($ws, $terminal, $serializeAddon, port) {
+		const PAUSE = '\x13';   // XOFF
+		const RESUME = '\x11';  // XON
+
+		function TflowCtrl() {
+			if($ws._count > 0) {
+				$ws._count -= 4;
+			}
+			if($ws._count <= 0) {
+				$ws._count = 0;
+				$ws.timer = 0;
+				this._sendData(RESUME);
+			} else {
+				$ws.timer = setTimeout(TflowCtrl,1);
+			}
+		}
+		function startFL() {
+			if(!$ws.timer) {
+				$ws.timer = setTimeout(TflowCtrl,1);
+			}
+		}
+		if(!("queue" in $ws)) {
+			$ws._count = 0;
+			$ws.timer = 0;
+		}
         $ws.onmessage = async (ev) => {
+			
+
             let data = ev.data;
+			if(typeof data === 'string') {
+				$ws._count += data.length;
+			}
             $terminal.write(typeof data === 'string' ? data : new Uint8Array(data));
+			startFL();
+			if($ws._count > 4096) {
+				this._sendData(PAUSE);
+			}
             let terminalState = $serializeAddon.serialize();
             let terminalCont = {
                 "wsPort": port,

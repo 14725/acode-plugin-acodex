@@ -10,14 +10,22 @@ const server = new WebSocketServer({
     port: port,
 });
 
+const PAUSE = '\x13';   // XOFF
+const RESUME = '\x11';  // XON
+
 server.on("connection", function (connection) {
     const shell = pty.spawn("bash", [], {
         name: "xterm-256color",
         cwd: process.env.HOME,
         env: process.env,
+		handleFlowControl: true
     });
     connection.on("message", function (message) {
         const command = typeof message === "string" ? message.trim() : message.toString("utf8").trim();
+		if(message == PAUSE || message == RESUME) {
+			shell.write(command);	
+			return;
+		}
         if (command === "exit") {
             shell.kill("SIGTERM");
             connection.close();
