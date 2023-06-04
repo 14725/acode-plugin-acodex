@@ -292,41 +292,51 @@ class AcodeX {
 		const PAUSE = '\x13';   // XOFF
 		const RESUME = '\x11';  // XON
 		const BAT_LIM = 256;
+		const FREE_TIME = 10;
 		var that = this;
-		function TflowCtrl() {
+		function TflowCtrl(deadline) {
 			try {
 				$ws.timer = 0;
-				if ($ws._queue.length > 0) {
-					let data = $ws._queue[0];
-					if (data.length > BAT_LIM) {
-						data = data.slice(0, BAT_LIM);
-						$ws._queue[0] = $ws._queue[0].slice(BAT_LIM);
+				do {
+					if ($ws._queue.length > 0) {
+						let data = $ws._queue[0];
+						if (data.length > BAT_LIM) {
+							data = data.slice(0, BAT_LIM);
+							$ws._queue[0] = $ws._queue[0].slice(BAT_LIM);
+						} else {
+							$ws._queue.shift();
+						}
+						$terminal.write(data);
+	
 					} else {
-						$ws._queue.shift();
+						break;
 					}
-					$terminal.write(data);
-
-				}
+				} while(deadline.timeRemaining() > FREE_TIME);
+				
 				if ($ws._queue.length > 0) {
 					startFL();
-				} else {
+				} 
+				if ($ws._queue.length < 4) {
 					//window.alert("Resume!");
 					that._sendData(RESUME);
 					$ws._havePaused = false;
+					//$ws._havePaused = false;
 				}
 				/*window.alert(JSON.stringify({
 					queue_length: $ws._queue.length,
 					havePaused: $ws._havePaused
 				}, null, 4));*/
 			} catch (e) {
-				alert(e.stack || e);
+				window.alert(e.stack || e);
 			}
 
 		}
 		function startFL() {
+			try {
 			if (!$ws.timer) {
-				$ws.timer = setTimeout(TflowCtrl, 1);
+				$ws.timer = window.requestIdleCallback(TflowCtrl, {timeout:250});
 			}
+		}catch(e){window.alert(e.stack || e);}
 		}
 		if (!("queue" in $ws)) {
 			$ws._queue = [];
@@ -340,23 +350,11 @@ class AcodeX {
 			//$terminal.write(data);
 			$ws._queue.push(data);
 			startFL();
-			if ($ws._queue.length > 4 && !$ws._havePaused) {
+			if ($ws._queue.length > 64 && !$ws._havePaused) {
 				this._sendData(PAUSE);
 				$ws._havePaused = true;
 			}
-			let terminalState = $serializeAddon.serialize();
-			let terminalCont = {
-				"wsPort": port,
-				"terminalContainerHeight": this.$terminalContainer.offsetHeight,
-				"terminalData": terminalState
-			}
 			//this.checkTerminalFolder();
-			const fs = fsOperation(TERMINAL_STORE_PATH + "/session1.json");
-			if (!await fs.exists()) {
-				await fsOperation(TERMINAL_STORE_PATH).createFile('session1.json', terminalCont);
-			} else {
-				await fs.writeFile(terminalCont);
-			}
 			//window.alert(terminalState)
 		}
 	}
